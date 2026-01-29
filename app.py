@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -9,15 +8,14 @@ from sklearn.metrics.pairwise import cosine_similarity
 # ------------------------------------
 st.set_page_config(
     page_title="Movie Recommendation System",
-    page_icon="🎬",
-    layout="centered"
+    page_icon="🎬"
 )
 
 st.title("🎬 Movie Recommendation System")
-st.write("Content-Based Movie Recommendation using TF-IDF")
+st.write("Enhanced Content-Based Recommendation System")
 
 # ------------------------------------
-# Load Data
+# Load Dataset
 # ------------------------------------
 @st.cache_data
 def load_data():
@@ -29,7 +27,7 @@ def load_data():
 movies = load_data()
 
 # ------------------------------------
-# Text Processing & Similarity
+# TF-IDF & Similarity
 # ------------------------------------
 @st.cache_resource
 def compute_similarity(data):
@@ -41,21 +39,43 @@ def compute_similarity(data):
 similarity_matrix = compute_similarity(movies)
 
 # ------------------------------------
-# Recommendation Function
+# Extract Unique Genres
 # ------------------------------------
-def recommend_movies(movie_title, num_recommendations=5):
+def get_all_genres():
+    genres = set()
+    for g in movies['genres']:
+        for genre in g.split('|'):
+            genres.add(genre)
+    return sorted(genres)
+
+all_genres = get_all_genres()
+
+# ------------------------------------
+# Recommendation Function (ENHANCED)
+# ------------------------------------
+def recommend_movies(movie_title, genre_filter, top_n=5):
     if movie_title not in movies['title'].values:
         return []
 
-    index = movies[movies['title'] == movie_title].index[0]
-    similarity_scores = list(enumerate(similarity_matrix[index]))
+    idx = movies[movies['title'] == movie_title].index[0]
+    similarity_scores = list(enumerate(similarity_matrix[idx]))
     similarity_scores = sorted(similarity_scores, key=lambda x: x[1], reverse=True)
 
-    recommended_movies = []
-    for i in similarity_scores[1:num_recommendations + 1]:
-        recommended_movies.append(movies.iloc[i[0]]['title'])
+    recommendations = []
+    for i in similarity_scores[1:]:
+        movie = movies.iloc[i[0]]
 
-    return recommended_movies
+        # Genre filter logic
+        if genre_filter != "All":
+            if genre_filter not in movie['genres']:
+                continue
+
+        recommendations.append(movie)
+
+        if len(recommendations) == top_n:
+            break
+
+    return recommendations
 
 # ------------------------------------
 # Streamlit UI
@@ -63,20 +83,27 @@ def recommend_movies(movie_title, num_recommendations=5):
 movie_list = movies['title'].values
 selected_movie = st.selectbox("🎥 Select a Movie", movie_list)
 
-num_recs = st.slider("Number of Recommendations", 1, 10, 5)
+selected_genre = st.selectbox(
+    "🎭 Filter by Genre",
+    ["All"] + all_genres
+)
 
-if st.button("Recommend"):
-    recommendations = recommend_movies(selected_movie, num_recs)
+num_recs = st.slider("📌 Number of Recommendations", 1, 5, 3)
 
-    if recommendations:
-        st.subheader("✅ Recommended Movies:")
-        for i, movie in enumerate(recommendations, start=1):
-            st.write(f"{i}. {movie}")
+if st.button("Recommend Movies"):
+    results = recommend_movies(selected_movie, selected_genre, num_recs)
+
+    if results:
+        st.subheader("✅ Recommended Movies")
+        for movie in results:
+            st.markdown(f"### 🎬 {movie['title']}")
+            st.write(f"📝 **Overview:** {movie['overview']}")
+            st.write(f"🎭 **Genres:** {movie['genres']}")
+            st.markdown("---")
     else:
-        st.warning("No recommendations found.")
+        st.warning("No movies found for the selected genre.")
 
 # ------------------------------------
 # Footer
 # ------------------------------------
-st.markdown("---")
-st.caption("Built with ❤️ using Python & Streamlit")
+st.caption("University Project | Python • ML • Streamlit")
